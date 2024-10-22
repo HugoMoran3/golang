@@ -1,67 +1,56 @@
+// main.go
 package main
 
 import (
-    "encoding/csv"
-    "encoding/json"
-    "flag"
-    "fmt"
-    "os"
-    "path/filepath"
-    "strings"
+	"encoding/csv"
+	"fmt"
+	"os"
 )
 
 func main() {
-    // Define command-line flags
-    inputFile := flag.String("input", "", "Input CSV file")
-    outputFile := flag.String("output", "", "Output JSON file")
-    flag.Parse()
+   // Open the CSV file
+   file, err := os.Open("people.csv")
+   if err != nil {
+       panic(err)
+   }
+   defer file.Close()
 
-    // Validate input and output files
-    if *inputFile == "" || *outputFile == "" {
-        fmt.Println("Please provide both input and output file names.")
-        flag.PrintDefaults()
-        os.Exit(1)
-    }
+      // Read the CSV data
+      reader := csv.NewReader(file)
+      reader.FieldsPerRecord = -1 // Allow variable number of fields
+      data, err := reader.ReadAll()
+      if err != nil {
+          panic(err)
+      }
+   
+      // Print the CSV data
+      for _, row := range data {
+          for _, col := range row {
+              fmt.Printf("%s,", col)
+          }
+          fmt.Println()
+      }
 
-    // Read CSV file
-    csvFile, err := os.Open(*inputFile)
-    if err != nil {
-        fmt.Println("Error opening CSV file:", err)
-        os.Exit(1)
-    }
-    defer csvFile.Close()
 
-    reader := csv.NewReader(csvFile)
-    records, err := reader.ReadAll()
-    if err != nil {
-        fmt.Println("Error reading CSV:", err)
-        os.Exit(1)
-    }
+   // Write the CSV data
+   file2, err := os.Create("data1.csv")
+   if err != nil {
+       panic(err)
+   }
+   defer file2.Close()
 
-    // Convert CSV to JSON
-    var result []map[string]string
-    headers := records[0]
+   writer := csv.NewWriter(file2)
+   defer writer.Flush()
+// this defines the header value and data values for the new csv file
+   headers := []string{"name", "age", "gender"}
+   data1 := [][]string{
+       {"Alice", "25", "Female"},
+       {"Bob", "30", "Male"},
+       {"Charlie", "35", "Male"},
+   }
 
-    for _, record := range records[1:] {
-        row := make(map[string]string)
-        for i, value := range record {
-            row[headers[i]] = value
-        }
-        result = append(result, row)
-    }
-
-    // Write JSON to file
-    jsonData, err := json.MarshalIndent(result, "", "  ")
-    if err != nil {
-        fmt.Println("Error marshaling JSON:", err)
-        os.Exit(1)
-    }
-
-    err = os.WriteFile(*outputFile, jsonData, 0644)
-    if err != nil {
-        fmt.Println("Error writing JSON file:", err)
-        os.Exit(1)
-    }
-
-    fmt.Printf("Successfully converted %s to %s\n", *inputFile, *outputFile)
+   writer.Write(headers)
+   for _, row := range data1 {
+       writer.Write(row)
+   }
 }
