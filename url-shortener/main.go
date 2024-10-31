@@ -1,16 +1,19 @@
 package main
 
 import (
-    "fmt"
-    "math/rand"
-    "net/http"
-    "strings"
-    "time"
+	"fmt"
+	"math/rand"
+	"net/http"
+	"strings"
+	"time"
 )
 
 var urls = make(map[string]string)
 
 func main() {
+    // Initialize random seed
+    rand.Seed(time.Now().UnixNano())
+
     http.HandleFunc("/", handleForm)
     http.HandleFunc("/shorten", handleShorten)
     http.HandleFunc("/short/", handleRedirect)
@@ -194,12 +197,9 @@ func generateShortKey() string {
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     const keyLength = 6
 
-    // Create a new random source
-    r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
     shortKey := make([]byte, keyLength)
     for i := range shortKey {
-        shortKey[i] = charset[r.Intn(len(charset))]
+        shortKey[i] = charset[rand.Intn(len(charset))]
     }
     return string(shortKey)
 }
