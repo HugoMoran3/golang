@@ -1,57 +1,104 @@
 package main
 
 import (
-	"fmt"
-	"github.com/gocolly/colly"
+    "encoding/csv"
+    "fmt"
+    "log"
+    "os"
+    "github.com/gocolly/colly"
+		"github.com/gocolly/colly/debug"
 )
 
 type Product struct {
-	Url, Image, Name, Price string
+    Url, Image, Name, Price string
 }
 
 func main() {
-    // create new collector object instance
-    c := colly.NewCollector(
-	colly.AllowedDomains("www.scrapingcourse.com"),
-	)
+    fmt.Println("Starting the scraper...")
 
-    // initialise the slices that will contain scraped data
+    c := colly.NewCollector(
+        colly.AllowedDomains("www.scrapingcourse.com"),
+        // Enable debugging
+        colly.Debugger(&debug.LogDebugger{}),
+    )
+
     var products []Product
 
-    // OnHTML callback
-    c.OnHTML(".product", func(e *colly.HTMLElement){
-
+    // Add error handling
+    c.OnError(func(r *colly.Response, err error) {
+        fmt.Printf("Error while scraping: %v\n", err)
+        fmt.Printf("Status code: %d\n", r.StatusCode)
     })
 
-    // called before an HTTP request is triggered
+    // Log when request is made
     c.OnRequest(func(r *colly.Request) {
-        fmt.Println("Visiting: ", r.URL)
+        fmt.Printf("Visiting: %s\n", r.URL)
     })
 
-    // triggered when the scraper encounters an error
-    c.OnError(func(_ *colly.Response, err error) {
-        fmt.Println("Something went wrong: ", err)
-    })
-
-    // fired when the server responds
+    // Log response received
     c.OnResponse(func(r *colly.Response) {
-        fmt.Println("Page visited: ", r.Request.URL)
+        fmt.Printf("Received response: %d bytes\n", len(r.Body))
+        // Uncomment to see the HTML content
+        // fmt.Printf("Response body: %s\n", string(r.Body))
     })
 
-    // triggered when a CSS selector matches an element
-    c.OnHTML("a", func(e *colly.HTMLElement) {
-        // printing all URLs associated with the <a> tag on the page
-        fmt.Println("%v", e.Attr("href"))
+    c.OnHTML("li.product", func(e *colly.HTMLElement) {
+        fmt.Println("Found a product element!")
+
+        product := Product{}
+        product.Url = e.ChildAttr("a", "href")
+        product.Image = e.ChildAttr("img", "src")
+        product.Name = e.ChildText(".product-name")
+        product.Price = e.ChildText(".price")
+
+        fmt.Printf("Scraped product: %+v\n", product)
+        products = append(products, product)
     })
 
-    // triggered once scraping is done (e.g., write the data to a CSV file)
     c.OnScraped(func(r *colly.Response) {
-        fmt.Println(r.Request.URL, " scraped!")
+        fmt.Printf("Finished scraping. Found %d products\n", len(products))
+
+        file, err := os.Create("products.csv")
+        if err != nil {
+            log.Fatalln("Failed to create output CSV file", err)
+        }
+        defer file.Close()
+
+        writer := csv.NewWriter(file)
+        headers := []string{
+            "Url",
+            "Image",
+            "Name",
+            "Price",
+        }
+
+        if err := writer.Write(headers); err != nil {
+            log.Fatalln("Error writing headers:", err)
+        }
+
+        for _, product := range products {
+            record := []string{
+                product.Url,
+                product.Image,
+                product.Name,
+                product.Price,
+            }
+            if err := writer.Write(record); err != nil {
+                log.Fatalln("Error writing record:", err)
+            }
+        }
+        writer.Flush()
+
+        if err := writer.Error(); err != nil {
+            log.Fatalln("Error flushing writer:", err)
+        }
+
+        fmt.Println("Successfully wrote data to products.csv")
     })
 
-
-    // open the target URL
-    c.Visit("https://www.scrapingcourse.com/ecommerce")
-
-
+    fmt.Println("Starting to visit the URL...")
+    err := c.Visit("https://www.scrapingcourse.com/ecommerce")
+    if err != nil {
+        log.Fatalf("Error visiting the URL: %v", err)
+    }
 }
